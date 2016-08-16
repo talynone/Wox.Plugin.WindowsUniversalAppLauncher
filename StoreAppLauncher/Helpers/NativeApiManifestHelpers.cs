@@ -100,7 +100,9 @@ namespace StoreAppLauncher.Helpers
         {
             if (string.IsNullOrWhiteSpace(resourceName)) return null;
 
-            if (path.ToLower().Contains("project"))
+            //if (path.ToLower().Contains("project"))
+            
+            if (path.ToLower().Contains("blockedin"))
             {
                 var blah = "connected";
             }
@@ -126,7 +128,7 @@ namespace StoreAppLauncher.Helpers
             foreach (var file in files)
             {
                 string fileName = System.IO.Path.GetFileNameWithoutExtension(file);
-                int pos = fileName.IndexOf(scaleToken) + scaleToken.Length;
+                int pos = fileName.ToLower().IndexOf(scaleToken) + scaleToken.Length;
                 string sizeText = fileName.Substring(pos);
                 int size;
                 if (int.TryParse(sizeText, out size))
@@ -161,7 +163,7 @@ namespace StoreAppLauncher.Helpers
 
                 foreach (var folder in folders)
                 {
-                    int pos = folder.IndexOf(scaleFolderToken) + scaleFolderToken.Length;
+                    int pos = folder.ToLower().IndexOf(scaleFolderToken) + scaleFolderToken.Length;
                     string sizeText = folder.Substring(pos);
                     int size;
 
@@ -315,7 +317,7 @@ namespace StoreAppLauncher.Helpers
 
         
 
-        public static IEnumerable<PackageInfoEx> ToPackageInfoEx(IEnumerable<Windows.ApplicationModel.Package> packages)
+        public static IEnumerable<PackageInfoEx> ToPackageInfoEx(IEnumerable<Windows.ApplicationModel.Package> packages, bool processLogo = true)
         {
 
 //            var wincord = packages.FirstOrDefault(p => p.Id.Name.ToLower().Contains("wincord"));
