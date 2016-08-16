@@ -8,7 +8,8 @@ using System.Runtime.InteropServices.ComTypes;
 namespace StoreAppLauncher.Helpers
 {        
     public static class NativeApiHelper
-    {        
+    {
+        #region Api Declerations
         [DllImport("shlwapi.dll", BestFitMapping = false, CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = false, ThrowOnUnmappableChar = true)]
         private static extern int SHLoadIndirectString(string pszSource, StringBuilder pszOutBuf, int cchOutBuf, IntPtr ppvReserved);
 
@@ -77,6 +78,7 @@ namespace StoreAppLauncher.Helpers
                 [MarshalAs(UnmanagedType.LPWStr)] string name,
                 [MarshalAs(UnmanagedType.LPWStr)] out string vaue);
         }
+        #endregion Api Declerations
 
         public static string GetStringValue(IAppxManifestApplication app, string name)
         {
@@ -101,7 +103,7 @@ namespace StoreAppLauncher.Helpers
             return value;
         }
 
-        public static string LoadIndirectStringEx(string resource, string resourceKey)
+        private static string LoadIndirectStringEx(string resource, string resourceKey)
         {
             var outBuffer = new StringBuilder(1024);
 
@@ -149,13 +151,7 @@ namespace StoreAppLauncher.Helpers
                 url = resourceScheme + "///resources/" + part;
             }
 
-            var extractedValue = LoadIndirectStringEx(packageFullName, url);
-
-            //TODO: Uh oh
-//            if (string.IsNullOrEmpty(extractedValue))
-//            {
-//                Console.WriteLine(packageFullName);
-//            }            
+            var extractedValue = LoadIndirectStringEx(packageFullName, url);     
 
             return extractedValue;
         }

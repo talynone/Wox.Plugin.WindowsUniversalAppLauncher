@@ -94,10 +94,24 @@ namespace StoreAppLauncher.Helpers
 
             return null;
         }
-        
 
-        public static string FindClosestTo100ScaleQualifiedImagePath(string path, string resourceName)
-        {
+
+        public enum FindLogoScaleStrategy
+        {        
+            Highest = 0,
+            NeareastToCustomScale = 1,
+        }
+
+        
+        public static string FindLogoImagePath(string path, string resourceName, FindLogoScaleStrategy findLogoScaleStrategy, int scaleValue = 100)
+        {                        
+            var isValidFindStrategy = Enum.IsDefined(typeof(FindLogoScaleStrategy), findLogoScaleStrategy);
+
+            if (!isValidFindStrategy)
+            {
+                throw new ArgumentException("Invalid find logo strategy." + findLogoScaleStrategy);
+            }
+
             if (string.IsNullOrWhiteSpace(resourceName)) return null;
 
             //if (path.ToLower().Contains("project"))
@@ -109,12 +123,12 @@ namespace StoreAppLauncher.Helpers
 
             var logoSizes = new List<int>();
 
-            const string scaleToken = ".scale-";            
+            const string fileNameScaleToken = ".scale-";            
 
-            string fileNameWithoutExtension = System.IO.Path.GetFileNameWithoutExtension(resourceName);
-            string fileExtension = System.IO.Path.GetExtension(resourceName);
+            string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(resourceName);
+            string fileExtension = Path.GetExtension(resourceName);
 
-            var folderPath = System.IO.Path.Combine(path, System.IO.Path.GetDirectoryName(resourceName));
+            var folderPath = Path.Combine(path, Path.GetDirectoryName(resourceName));
 
             if (!Directory.Exists(folderPath))
             {
@@ -123,12 +137,12 @@ namespace StoreAppLauncher.Helpers
 
             var files = Directory.EnumerateFiles(
                 System.IO.Path.Combine(path, folderPath),
-                fileNameWithoutExtension + scaleToken + "*" + fileExtension);
+                fileNameWithoutExtension + fileNameScaleToken + "*" + fileExtension);
 
             foreach (var file in files)
             {
-                string fileName = System.IO.Path.GetFileNameWithoutExtension(file);
-                int pos = fileName.ToLower().IndexOf(scaleToken) + scaleToken.Length;
+                string fileName = Path.GetFileNameWithoutExtension(file);
+                int pos = fileName.ToLower().IndexOf(fileNameScaleToken) + fileNameScaleToken.Length;
                 string sizeText = fileName.Substring(pos);
                 int size;
                 if (int.TryParse(sizeText, out size))
@@ -139,13 +153,21 @@ namespace StoreAppLauncher.Helpers
 
             if (logoSizes.Count > 0)
             {
-                int closestToValue = 100;
-                int closestScale = logoSizes.Aggregate((x, y) => Math.Abs(x - closestToValue) < Math.Abs(y - closestToValue) ? x : y);
+                int desiredScale = scaleValue;
 
-                var sizedPath = System.IO.Path.Combine(
+                if (findLogoScaleStrategy == FindLogoScaleStrategy.Highest)
+                {
+                    desiredScale = logoSizes.Max();
+                }
+                else if (findLogoScaleStrategy == FindLogoScaleStrategy.NeareastToCustomScale)
+                {
+                    desiredScale = logoSizes.Aggregate((x, y) => Math.Abs(x - scaleValue) < Math.Abs(y - scaleValue) ? x : y);
+                }
+                
+                var sizedPath = Path.Combine(
                     path,
-                    System.IO.Path.GetDirectoryName(resourceName),
-                    fileNameWithoutExtension + scaleToken + closestScale + fileExtension);
+                    Path.GetDirectoryName(resourceName),
+                    fileNameWithoutExtension + fileNameScaleToken + desiredScale + fileExtension);
 
                 if (File.Exists(sizedPath))
                 {
@@ -153,7 +175,7 @@ namespace StoreAppLauncher.Helpers
                 }
             }
 
-            const string scaleFolderToken = "scale-";            
+            const string folderNameScaleToken = "scale-";            
 
             var folders = Directory.EnumerateDirectories(folderPath).Where(p=>p.Contains("scale-")).ToList();
 
@@ -163,7 +185,7 @@ namespace StoreAppLauncher.Helpers
 
                 foreach (var folder in folders)
                 {
-                    int pos = folder.ToLower().IndexOf(scaleFolderToken) + scaleFolderToken.Length;
+                    int pos = folder.ToLower().IndexOf(folderNameScaleToken) + folderNameScaleToken.Length;
                     string sizeText = folder.Substring(pos);
                     int size;
 
@@ -175,12 +197,20 @@ namespace StoreAppLauncher.Helpers
 
                 if (folderSizes.Count > 0)
                 {
-                    int closestToValue = 100;
-                    int closestScale = folderSizes.Aggregate((x, y) => Math.Abs(x - closestToValue) < Math.Abs(y - closestToValue) ? x : y);
+                    int desiredScale = scaleValue;
 
-                    var sizedFolderPath = System.IO.Path.Combine(
+                    if (findLogoScaleStrategy == FindLogoScaleStrategy.Highest)
+                    {
+                        desiredScale = folderSizes.Max();
+                    }
+                    else if (findLogoScaleStrategy == FindLogoScaleStrategy.NeareastToCustomScale)
+                    {
+                        desiredScale = folderSizes.Aggregate((x, y) => Math.Abs(x - scaleValue) < Math.Abs(y - scaleValue) ? x : y);
+                    }                    
+
+                    var sizedFolderPath = Path.Combine(
                         folderPath,
-                        scaleFolderToken + closestScale,
+                        folderNameScaleToken + desiredScale,
                         fileNameWithoutExtension + fileExtension);
 
                     if (File.Exists(sizedFolderPath))
@@ -191,7 +221,7 @@ namespace StoreAppLauncher.Helpers
             }
             
 
-            var finalPath = System.IO.Path.Combine(path, resourceName);
+            var finalPath = Path.Combine(path, resourceName);
 
             if (File.Exists(finalPath))
             {
@@ -200,27 +230,29 @@ namespace StoreAppLauncher.Helpers
 
             return null;
         }
-
-        //public static string GetBestLogoPath(Windows.ApplicationModel.Package package, ManifestInfo manifestInfo,string mainPackageLogoPath,string mainAppLogoPath)
+        
         public static string GetBestLogoPath(ManifestInfo manifestInfo, ManifestApplication manifestApplication, string installedLocationPath)
         {
-            var logoPath = FindClosestTo100ScaleQualifiedImagePath(installedLocationPath, manifestApplication.Logo);
-            
-            if (!string.IsNullOrWhiteSpace(logoPath) && File.Exists(logoPath))
-            {
-                return logoPath;
-                
-            }
-            
-            var mainPackageLogo = manifestInfo.GetPropertyStringValue("Logo");
-            
-            logoPath = FindClosestTo100ScaleQualifiedImagePath(installedLocationPath, mainPackageLogo);
+            var findStrategy = FindLogoScaleStrategy.NeareastToCustomScale;
+            string logoPath;
+           
 
+            // Try to find logo based on package logo value
+            var mainPackageLogo = manifestInfo.GetPropertyStringValue("Logo");            
+            logoPath = FindLogoImagePath(installedLocationPath, mainPackageLogo, findStrategy);
             if (!string.IsNullOrWhiteSpace(logoPath) && File.Exists(logoPath))
             {
                 return logoPath;
             }
-            
+
+            // TODO: More testing if this is even necessary
+            // Try to find logo based on application logo value
+            logoPath = FindLogoImagePath(installedLocationPath, manifestApplication.Logo, findStrategy);
+            if (!string.IsNullOrWhiteSpace(logoPath) && File.Exists(logoPath))
+            {
+                return logoPath;
+            }
+
             return "";
         }
 
@@ -274,52 +306,9 @@ namespace StoreAppLauncher.Helpers
             }
             return null;
         }
-
-        public static string FindHighestScaleQualifiedImagePath(string path, string resourceName)
-        {
-            if (resourceName == null) throw new ArgumentNullException("resourceName");
-
-            const string scaleToken = ".scale-";
-            var sizes = new List<int>();
-            string name = System.IO.Path.GetFileNameWithoutExtension(resourceName);
-            string ext = System.IO.Path.GetExtension(resourceName);
-
-            var folderPath = System.IO.Path.Combine(path, System.IO.Path.GetDirectoryName(resourceName));
-
-            if (!Directory.Exists(folderPath))
-            {
-                return null;
-            }
-
-            var files = Directory.EnumerateFiles(
-                System.IO.Path.Combine(path, folderPath),
-                name + scaleToken + "*" + ext);
-
-            foreach (var file in files)
-            {
-                string fileName = System.IO.Path.GetFileNameWithoutExtension(file);
-                int pos = fileName.IndexOf(scaleToken) + scaleToken.Length;
-                string sizeText = fileName.Substring(pos);
-                int size;
-                if (int.TryParse(sizeText, out size))
-                {
-                    sizes.Add(size);
-                }
-            }
-            if (sizes.Count == 0) return null;
-
-            sizes.Sort();
-            return System.IO.Path.Combine(
-                path,
-                System.IO.Path.GetDirectoryName(resourceName),
-                name + scaleToken + sizes.Last() + ext);
-        }
-
         
-
         public static IEnumerable<PackageInfoEx> ToPackageInfoEx(IEnumerable<Windows.ApplicationModel.Package> packages, bool processLogo = true)
         {
-
             var packageTest = packages.FirstOrDefault(p => p.Id.Name.ToLower().Contains("camera"));
 
             if (packageTest != null)
@@ -336,7 +325,6 @@ namespace StoreAppLauncher.Helpers
                 {
                     continue;
                 }
-
                 
                 var installedLocationPath = package.InstalledLocation.Path;                
                 var manifestPath = Path.Combine(installedLocationPath, "AppxManifest.xml");
@@ -346,7 +334,8 @@ namespace StoreAppLauncher.Helpers
                 {
                     foreach (var application in manifestInfo.Apps)
                     {
-                        // Configured not display on start menu
+                        // Configured to not display on start menu
+                        // so we skip theses
                         if (application?.AppListEntry == "none")
                         {
                             continue;                            
@@ -356,10 +345,10 @@ namespace StoreAppLauncher.Helpers
                         
                         var fullName = package.Id.FullName;
 
-                        if (installedLocationPath.ToLower().Contains("windowscommunicationsapps"))
-                        {
-                            var blah = "connected";
-                        }
+//                        if (installedLocationPath.ToLower().Contains("windowscommunicationsapps"))
+//                        {
+//                            var blah = "connected";
+//                        }
 
                         var displayName = NativeApiHelper.LoadResourceString(fullName, application.DisplayName);
 
@@ -367,11 +356,10 @@ namespace StoreAppLauncher.Helpers
                         // an app we care about
                         if (string.IsNullOrWhiteSpace(displayName))
                         {
+                            Debug.WriteLine(manifestPath);
                             continue;
                         }
-
                         
-
                         packageInfoEx.DisplayName = displayName;
 
                         var description = NativeApiHelper.LoadResourceString(fullName, application.Description);
@@ -380,9 +368,7 @@ namespace StoreAppLauncher.Helpers
                         {
                             packageInfoEx.Description = description;
                         }
-
                       
-
                         var logoPath = GetBestLogoPath(manifestInfo, application, installedLocationPath);
                         packageInfoEx.FullLogoPath = logoPath;
 
@@ -392,11 +378,8 @@ namespace StoreAppLauncher.Helpers
 //                        package.PublisherDisplayName = package.GetPropertyStringValue("PublisherDisplayName");
 //                        package.IsFramework = package.GetPropertyBoolValue("Framework");
 
-
                         packageInfoEx.FullName = fullName;
-
                         
-
                         yield return packageInfoEx;
                     }
                 }

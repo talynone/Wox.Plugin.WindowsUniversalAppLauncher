@@ -13,9 +13,13 @@ namespace ConsoleTester
         {
             var storeAppList = StoreAppLauncher.StoreAppLauncher.GetAppListForCurrentUser().ToList();
 
+            var blankIcons = storeAppList.Where(p => string.IsNullOrWhiteSpace(p.FullLogoPath)).ToList();
+            var blankDisplayNames = storeAppList.Where(p => string.IsNullOrWhiteSpace(p.FullLogoPath)).ToList();
+            var blankDisplayDescriptions = storeAppList.Where(p => string.IsNullOrWhiteSpace(p.FullLogoPath)).ToList();
+
             //var package = packagesList.FirstOrDefault(p => p.DisplayName != null && p.DisplayName.Contains("TD5"));
 
-            var package = storeAppList.FirstOrDefault(p => p.DisplayName.Contains("Netflix"));
+            var package = storeAppList.FirstOrDefault(p => p.DisplayName.Contains("Edge"));
 
             if (package != null)
             {
