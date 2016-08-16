@@ -1,32 +1,16 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
 
 namespace StoreAppLauncher.Helpers
-{
-    using System.ComponentModel;
-    using System.Diagnostics;
-    using System.Runtime.InteropServices;
-    using System.Runtime.InteropServices.ComTypes;
-    
-
+{        
     public static class NativeApiHelper
     {        
         [DllImport("shlwapi.dll", BestFitMapping = false, CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = false, ThrowOnUnmappableChar = true)]
         private static extern int SHLoadIndirectString(string pszSource, StringBuilder pszOutBuf, int cchOutBuf, IntPtr ppvReserved);
-
-        public static string LoadIndirectStringEx(string resource, string resourceKey)
-        {
-            var outBuffer = new StringBuilder(1024);
-
-            string source = string.Format("@{{{0}? {1}}}", resource, resourceKey);
-            
-            int result = SHLoadIndirectString(source, outBuffer, outBuffer.Capacity, IntPtr.Zero);
-
-            return outBuffer.ToString();
-        }
 
         [DllImport("kernel32")]
         static extern int OpenPackageInfoByFullName([MarshalAs(UnmanagedType.LPWStr)] string fullName, uint reserved, out IntPtr packageInfo);
@@ -37,20 +21,11 @@ namespace StoreAppLauncher.Helpers
         [DllImport("kernel32")]
         static extern int ClosePackageInfo(IntPtr pir);
 
-
         [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)]
-        public static extern int SHCreateStreamOnFileEx(
-        string fileName,
-        int grfMode,
-        int attributes,
-        bool create,
-        IntPtr reserved,
-        out IStream stream);
+        public static extern int SHCreateStreamOnFileEx(string fileName,int grfMode,int attributes,bool create,IntPtr reserved,out IStream stream);
 
         [Guid("5842a140-ff9f-4166-8f5c-62f5b7b0c781"), ComImport]
-        public class AppxFactory
-        {
-        }
+        public class AppxFactory {}
 
         [Guid("BEB94909-E451-438B-B5A7-D79E767B75D8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
         public interface IAppxFactory
@@ -126,19 +101,46 @@ namespace StoreAppLauncher.Helpers
             return value;
         }
 
-        public static string LoadResourceString(string packageFullName, string resource)
+        public static string LoadIndirectStringEx(string resource, string resourceKey)
         {
-            if (packageFullName == null) throw new ArgumentNullException("packageFullName");
+            var outBuffer = new StringBuilder(1024);
 
-            if (string.IsNullOrWhiteSpace(resource)) return null;
+            string source = string.Format("@{{{0}? {1}}}", resource, resourceKey);
+
+            int loadIndirectStringHResult = SHLoadIndirectString(source, outBuffer, outBuffer.Capacity, IntPtr.Zero);
+
+            if (loadIndirectStringHResult != 0)
+            {
+                return null;
+            }
+
+            return outBuffer.ToString();
+        }
+
+        public static string LoadResourceString(string packageFullName, string resourceKey)
+        {
+            if (string.IsNullOrWhiteSpace(resourceKey))
+            {
+                return null;
+            }
 
             const string resourceScheme = "ms-resource:";
-            if (!resource.StartsWith(resourceScheme)) return resource;
 
-            string part = resource.Substring(resourceScheme.Length);
+            //Console.WriteLine(resourceKey);
+
+            if (!resourceKey.StartsWith(resourceScheme))
+            {
+                return resourceKey;
+            }                
+
+            string part = resourceKey.Substring(resourceScheme.Length);
             string url;
 
-            if (part.StartsWith("/"))
+            if (part.StartsWith("//"))
+            {
+                url = resourceScheme + part;
+            }
+            else if (part.StartsWith("/"))
             {
                 url = resourceScheme + "//" + part;
             }
@@ -147,48 +149,72 @@ namespace StoreAppLauncher.Helpers
                 url = resourceScheme + "///resources/" + part;
             }
 
-            string source = string.Format("@{{{0}? {1}}}", packageFullName, url);
-            var sb = new StringBuilder(1024);
-            int i = SHLoadIndirectString(source, sb, sb.Capacity, IntPtr.Zero);
-            if (i != 0) return null;
+            var extractedValue = LoadIndirectStringEx(packageFullName, url);
 
-            return sb.ToString();
+            //TODO: Uh oh
+//            if (string.IsNullOrEmpty(extractedValue))
+//            {
+//                Console.WriteLine(packageFullName);
+//            }            
+
+            return extractedValue;
         }
 
         public static uint LaunchApp(string packageFullName, string arguments = null)
         {
-            IntPtr pir = IntPtr.Zero;
+            var pir = IntPtr.Zero;
+
             try
             {
-                int error = OpenPackageInfoByFullName(packageFullName, 0, out pir);
-                Debug.Assert(error == 0);
-                if (error != 0)
-                    throw new Win32Exception(error);
+                int openPackageInfoByFullNameErrorCodeResult = OpenPackageInfoByFullName(packageFullName, 0, out pir);
 
-                int length = 0, count;
-                GetPackageApplicationIds(pir, ref length, null, out count);
+                Debug.Assert(openPackageInfoByFullNameErrorCodeResult == 0);
+
+                if (openPackageInfoByFullNameErrorCodeResult != 0)
+                {
+                    throw new Win32Exception(openPackageInfoByFullNameErrorCodeResult);
+                }
+
+                int length = 0;
+                int count;
+
+                //f the function succeeds it returns ERROR_SUCCESS. Otherwise, the function 
+                //returns an error code. The possible error codes include the following.
+                //ERROR_INSUFFICIENT_BUFFER                
+                int getPackageApplicationIdsErrorResult = GetPackageApplicationIds(pir, ref length, null, out count);
 
                 var buffer = new byte[length];
-                error = GetPackageApplicationIds(pir, ref length, buffer, out count);
-                Debug.Assert(error == 0);
-                if (error != 0)
-                    throw new Win32Exception(error);
+
+                int getPackageApplicationIdsErrorCodeResult = GetPackageApplicationIds(pir, ref length, buffer, out count);
+                Debug.Assert(getPackageApplicationIdsErrorCodeResult == 0);
+
+                if (getPackageApplicationIdsErrorCodeResult != 0)
+                {
+                    throw new Win32Exception(openPackageInfoByFullNameErrorCodeResult);
+                }                    
 
                 var appUserModelId = Encoding.Unicode.GetString(buffer, IntPtr.Size * count, length - IntPtr.Size * count);
 
-                var activation = (IApplicationActivationManager)new ApplicationActivationManager();
+                var activation = new ApplicationActivationManager() as IApplicationActivationManager;
+
                 uint pid;
-                int hr = activation.ActivateApplication(appUserModelId, arguments ?? string.Empty, ActivateOptions.NoErrorUI, out pid);
-                if (hr < 0)
-                    Marshal.ThrowExceptionForHR(hr);
+
+                int activateApplicationHResult = activation.ActivateApplication(appUserModelId, arguments ?? string.Empty, ActivateOptions.NoErrorUI, out pid);
+
+                if (activateApplicationHResult < 0)
+                {
+                    Marshal.ThrowExceptionForHR(activateApplicationHResult);
+                }
+                    
                 return pid;
             }
             finally
             {
                 if (pir != IntPtr.Zero)
+                {
                     ClosePackageInfo(pir);
+                }                    
             }
-
         }
     }
 }

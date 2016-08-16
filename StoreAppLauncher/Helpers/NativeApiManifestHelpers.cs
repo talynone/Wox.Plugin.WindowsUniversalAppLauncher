@@ -320,12 +320,12 @@ namespace StoreAppLauncher.Helpers
         public static IEnumerable<PackageInfoEx> ToPackageInfoEx(IEnumerable<Windows.ApplicationModel.Package> packages, bool processLogo = true)
         {
 
-//            var wincord = packages.FirstOrDefault(p => p.Id.Name.ToLower().Contains("wincord"));
-//
-//            if (wincord != null)
-//            {
-//                var debugOut = "Blah!";
-//            }
+            var packageTest = packages.FirstOrDefault(p => p.Id.Name.ToLower().Contains("camera"));
+
+            if (packageTest != null)
+            {
+                var debugOut = "Blah!";
+            }
 
             foreach (var package in packages)
             {                
@@ -355,7 +355,12 @@ namespace StoreAppLauncher.Helpers
                         var packageInfoEx = new PackageInfoEx();
                         
                         var fullName = package.Id.FullName;
-                        
+
+                        if (installedLocationPath.ToLower().Contains("windowscommunicationsapps"))
+                        {
+                            var blah = "connected";
+                        }
+
                         var displayName = NativeApiHelper.LoadResourceString(fullName, application.DisplayName);
 
                         // Can't get display name, probably not 
@@ -375,6 +380,8 @@ namespace StoreAppLauncher.Helpers
                         {
                             packageInfoEx.Description = description;
                         }
+
+                      
 
                         var logoPath = GetBestLogoPath(manifestInfo, application, installedLocationPath);
                         packageInfoEx.FullLogoPath = logoPath;
