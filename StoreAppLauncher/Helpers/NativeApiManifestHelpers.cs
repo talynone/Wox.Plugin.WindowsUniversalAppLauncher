@@ -3,19 +3,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
+using System.Xml.Linq;
+using StoreAppLauncher.Models;
 
 namespace StoreAppLauncher.Helpers
 {
-    using System.Diagnostics;
-    using System.IO;
-    using System.Runtime.InteropServices;
-    using System.Runtime.InteropServices.ComTypes;
-    using System.Xml.Linq;
-
-    using Windows.UI.Xaml.Media.Imaging;
-
-
-    using global::StoreAppLauncher.Models;
+    using System.Drawing;
+    using System.Drawing.Drawing2D;
+    using System.Drawing.Imaging;    
 
     public static class NativeApiManifestHelpers
     {
@@ -27,32 +26,17 @@ namespace StoreAppLauncher.Helpers
             {
                 var factory = (NativeApiHelper.IAppxFactory)new NativeApiHelper.AppxFactory();
 
-                IStream strm;
+                IStream manifestStream;
 
-                NativeApiHelper.SHCreateStreamOnFileEx(
-                    manifestFilePath,
-                    STGM_SHARE_DENY_NONE,
-                    0,
-                    false,
-                    IntPtr.Zero,
-                    out strm);
+                NativeApiHelper.SHCreateStreamOnFileEx(manifestFilePath,STGM_SHARE_DENY_NONE,0,false,IntPtr.Zero,out manifestStream);
 
-                if (strm != null)
+                if (manifestStream != null)
                 {
                     var manifestInfo = new ManifestInfo();
 
-                    var reader = factory.CreateManifestReader(strm);
-                    var properties = reader.GetProperties();
-
-                    //                    object o = properties;
-                    //                    var propertyNames = o.GetType().GetProperties().Select(p => p.Name).ToList();
-                    //
-                    //
-                    //                    // Make sure it implements IDispatch.
-                    //                    var supportDispatch = DispatchUtility.ImplementsIDispatch(reader.GetProperties());
-                    //                    
-                    //                    
-
+                    var reader = factory.CreateManifestReader(manifestStream);                    
+                    var properties = reader.GetProperties();                    
+                    
                     manifestInfo.Properties = properties;
 
                     var apps = reader.GetApplications();
@@ -84,7 +68,7 @@ namespace StoreAppLauncher.Helpers
                         manifestInfo.Apps.Add(manifestApplication);
                         apps.MoveNext();
                     }
-                    Marshal.ReleaseComObject(strm);
+                    Marshal.ReleaseComObject(manifestStream);
 
                     return manifestInfo;
                 }
@@ -101,20 +85,13 @@ namespace StoreAppLauncher.Helpers
             return null;
         }
 
-
         public enum FindLogoScaleStrategy
         {
             Highest = 0,
-
             NeareastToCustomScale = 1,
         }
 
-
-        public static string FindLogoImagePath(
-            string path,
-            string resourceName,
-            FindLogoScaleStrategy findLogoScaleStrategy,
-            int scaleValue = 100)
+        public static string FindLogoImagePath(string path, string resourceName, FindLogoScaleStrategy findLogoScaleStrategy, int scaleValue = 100)
         {
             var isValidFindStrategy = Enum.IsDefined(typeof(FindLogoScaleStrategy), findLogoScaleStrategy);
 
@@ -123,17 +100,11 @@ namespace StoreAppLauncher.Helpers
                 throw new ArgumentException("Invalid find logo strategy." + findLogoScaleStrategy);
             }
 
-            if (string.IsNullOrWhiteSpace(resourceName)) return null;
-
-            //if (path.ToLower().Contains("project"))
-
-            if (path.ToLower().Contains("blockedin"))
+            if (string.IsNullOrWhiteSpace(resourceName))
             {
-                var blah = "connected";
-            }
-
-            var logoSizes = new List<int>();
-
+                return null;
+            }                  
+            
             const string fileNameScaleToken = ".scale-";
 
             string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(resourceName);
@@ -146,100 +117,90 @@ namespace StoreAppLauncher.Helpers
                 return null;
             }
 
-            var files = Directory.EnumerateFiles(
-                System.IO.Path.Combine(path, folderPath),
-                fileNameWithoutExtension + fileNameScaleToken + "*" + fileExtension);
+            // Try to find logos by file names in folder first
+            var files = Directory.EnumerateFiles(Path.Combine(path, folderPath),fileNameWithoutExtension + fileNameScaleToken + "*" + fileExtension).ToList();
 
-            foreach (var file in files)
+            files = files.Select(Path.GetFileNameWithoutExtension).ToList();            
+
+            if (files.Any())
             {
-                string fileName = Path.GetFileNameWithoutExtension(file);
-                int pos = fileName.ToLower().IndexOf(fileNameScaleToken) + fileNameScaleToken.Length;
-                string sizeText = fileName.Substring(pos);
-                int size;
-                if (int.TryParse(sizeText, out size))
+                var foundFilesScale = GetDesiredLogoScale(files, findLogoScaleStrategy, fileNameScaleToken, scaleValue);
+
+                var sizedFilePath = Path.Combine(path,Path.GetDirectoryName(resourceName),fileNameWithoutExtension + fileNameScaleToken + foundFilesScale + fileExtension);
+
+                if (File.Exists(sizedFilePath))
                 {
-                    logoSizes.Add(size);
+                    return sizedFilePath;
                 }
             }
 
-            if (logoSizes.Count > 0)
-            {
-                int desiredScale = scaleValue;
-
-                if (findLogoScaleStrategy == FindLogoScaleStrategy.Highest)
-                {
-                    desiredScale = logoSizes.Max();
-                }
-                else if (findLogoScaleStrategy == FindLogoScaleStrategy.NeareastToCustomScale)
-                {
-                    desiredScale =
-                        logoSizes.Aggregate((x, y) => Math.Abs(x - scaleValue) < Math.Abs(y - scaleValue) ? x : y);
-                }
-
-                var sizedPath = Path.Combine(
-                    path,
-                    Path.GetDirectoryName(resourceName),
-                    fileNameWithoutExtension + fileNameScaleToken + desiredScale + fileExtension);
-
-                if (File.Exists(sizedPath))
-                {
-                    return sizedPath;
-                }
-            }
-
+            // If no files found try to mach again sub folder names
             const string folderNameScaleToken = "scale-";
 
             var folders = Directory.EnumerateDirectories(folderPath).Where(p => p.Contains("scale-")).ToList();
 
             if (folders.Any())
-            {
-                var folderSizes = new List<int>();
+            {               
+                var foundScale = GetDesiredLogoScale(folders, findLogoScaleStrategy, folderNameScaleToken, scaleValue);
 
-                foreach (var folder in folders)
+                if (foundScale != null)
                 {
-                    int pos = folder.ToLower().IndexOf(folderNameScaleToken) + folderNameScaleToken.Length;
-                    string sizeText = folder.Substring(pos);
-                    int size;
-
-                    if (int.TryParse(sizeText, out size))
-                    {
-                        folderSizes.Add(size);
-                    }
-                }
-
-                if (folderSizes.Count > 0)
-                {
-                    int desiredScale = scaleValue;
-
-                    if (findLogoScaleStrategy == FindLogoScaleStrategy.Highest)
-                    {
-                        desiredScale = folderSizes.Max();
-                    }
-                    else if (findLogoScaleStrategy == FindLogoScaleStrategy.NeareastToCustomScale)
-                    {
-                        desiredScale =
-                            folderSizes.Aggregate((x, y) => Math.Abs(x - scaleValue) < Math.Abs(y - scaleValue) ? x : y);
-                    }
-
                     var sizedFolderPath = Path.Combine(
                         folderPath,
-                        folderNameScaleToken + desiredScale,
+                        folderNameScaleToken + foundScale,
                         fileNameWithoutExtension + fileExtension);
 
                     if (File.Exists(sizedFolderPath))
                     {
                         return sizedFolderPath;
                     }
-                }
+                }               
             }
 
-
+            // Finally just do an exact match with no 
+            // scale specifier
             var finalPath = Path.Combine(path, resourceName);
 
             if (File.Exists(finalPath))
             {
                 return finalPath;
             }
+
+            return null;
+        }
+
+        private static int? GetDesiredLogoScale(IList<string> paths, FindLogoScaleStrategy findLogoScaleStrategy, string token, int desiredScaleValue)
+        {
+            var scales = new List<int>();
+
+            foreach (var path in paths)
+            {
+                int pos = path.ToLower().IndexOf(token) + token.Length;
+                string sizeText = path.Substring(pos);
+                int size;
+
+                if (int.TryParse(sizeText, out size))
+                {
+                    scales.Add(size);
+                }
+            }
+
+            if (scales.Count > 0)
+            {
+                int closestScale = desiredScaleValue;
+
+                if (findLogoScaleStrategy == FindLogoScaleStrategy.Highest)
+                {
+                    closestScale = scales.Max();
+                }
+                else if (findLogoScaleStrategy == FindLogoScaleStrategy.NeareastToCustomScale)
+                {
+                    closestScale =
+                        scales.Aggregate((x, y) => Math.Abs(x - desiredScaleValue) < Math.Abs(y - desiredScaleValue) ? x : y);
+                }
+
+                return closestScale;
+            }            
 
             return null;
         }
@@ -309,20 +270,7 @@ namespace StoreAppLauncher.Helpers
 
                 return finalLogo;
 
-                //                if (System.IO.File.Exists(finalLogo))
-                //                {
-                //                    using (var fs = File.OpenRead(finalLogo))
-                //                    {
-                //                        var img = new BitmapImage()
-                //                        {
-                //                        };
-                //                        img.BeginInit();
-                //                        img.StreamSource = fs;
-                //                        img.CacheOption = BitmapCacheOption.OnLoad;
-                //                        img.EndInit();
-                //                        return img;
-                //                    }
-                //                }
+                
             }
             return null;
         }
@@ -340,11 +288,7 @@ namespace StoreAppLauncher.Helpers
 
             foreach (var package in packages)
             {
-                if (package.Id.Name.ToLower().Contains("reader"))
-                {
-                    var debugOut = "Blah!";
-                }
-
+               
                 // We don't care about framework
                 // packages, these packages are libraries
                 // not apps
@@ -378,15 +322,11 @@ namespace StoreAppLauncher.Helpers
                         {
                             continue;                            
                         }
+                        
 
                         var packageInfoEx = new PackageInfoEx();
                         
                         var fullName = package.Id.FullName;
-
-//                        if (installedLocationPath.ToLower().Contains("windowscommunicationsapps"))
-//                        {
-//                            var blah = "connected";
-//                        }
 
                         var displayName = NativeApiHelper.LoadResourceString(fullName, application.DisplayName);
 
@@ -409,6 +349,7 @@ namespace StoreAppLauncher.Helpers
                       
                         var logoPath = GetBestLogoPath(manifestInfo, application, installedLocationPath);
                         packageInfoEx.FullLogoPath = logoPath;
+                        packageInfoEx.AppInfo = application;
 
 //                        package.Description = package.GetPropertyStringValue("Description");
 //                        package.DisplayName = package.GetPropertyStringValue("DisplayName");
@@ -417,7 +358,8 @@ namespace StoreAppLauncher.Helpers
 //                        package.IsFramework = package.GetPropertyBoolValue("Framework");
 
                         packageInfoEx.FullName = fullName;
-                        
+                        packageInfoEx.Name = package.Id.Name;
+
                         yield return packageInfoEx;
                     }
                 }

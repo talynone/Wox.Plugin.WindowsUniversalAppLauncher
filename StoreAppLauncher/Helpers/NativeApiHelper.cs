@@ -8,6 +8,7 @@ using System.Runtime.InteropServices.ComTypes;
 namespace StoreAppLauncher.Helpers
 {
     using System.Collections.Generic;
+    using System.Linq;
 
     public static class NativeApiHelper
     {
@@ -130,8 +131,6 @@ namespace StoreAppLauncher.Helpers
 
             const string resourceScheme = "ms-resource:";
 
-            //Console.WriteLine(resourceKey);
-
             if (!resourceKey.StartsWith(resourceScheme))
             {
                 return resourceKey;
@@ -158,39 +157,15 @@ namespace StoreAppLauncher.Helpers
             return extractedValue;
         }
 
-//        private static string[] MultiNullTerminatedStringToUnicodeStringArray(string inputString)
-//        {            
-//            return MultiNullTerminatedCharToStringArray(inputString.ToCharArray());
-//        }
-//
-//        private static string[] MultiNullTerminatedCharToStringArray(char[] multistring)
-//        {
-//            List<string> stringList = new List<string>();
-//            int i = 0;
-//            while (i < multistring.Length)
-//            {
-//                int j = i;
-//                if (multistring[j++] == '\0') break;
-//                while (j < multistring.Length)
-//                {
-//                    if (multistring[j++] == '\0')
-//                    {
-//                        stringList.Add(new string(multistring, i, j - i - 1));
-//                        i = j;
-//                        break;
-//                    }
-//                }
-//            }
-//
-//            return stringList.ToArray();
-//        }
-
-        public static uint LaunchApp(string packageFullName, string arguments = null)
+        public static uint LaunchApp(string packageFullName, string appId = null, string arguments = null)
         {
             var pir = IntPtr.Zero;
 
             try
             {
+                
+
+              
                 int openPackageInfoByFullNameErrorCodeResult = OpenPackageInfoByFullName(packageFullName, 0, out pir);
 
                 Debug.Assert(openPackageInfoByFullNameErrorCodeResult == 0);
@@ -202,7 +177,7 @@ namespace StoreAppLauncher.Helpers
 
                 int length = 0;
                 int appIdCount;
-                
+
                 // First you pass NULL to buffer to get the required size of buffer. You use 
                 // this number to allocate memory space for buffer. Then you pass the 
                 // address of this memory space to fill buffer.             
@@ -220,18 +195,28 @@ namespace StoreAppLauncher.Helpers
                 {
                     throw new Win32Exception(getPackageApplicationIdsErrorCodeResult);
                 }
-                
-                var appUserModelId = Encoding.Unicode.GetString(buffer, IntPtr.Size * appIdCount, length - IntPtr.Size * appIdCount);
 
-                // If more than one Id exists then extract the first one out of 
-                // the null terminated unicode result
+                string appUserModelId = Encoding.Unicode.GetString(buffer, IntPtr.Size * appIdCount, length - IntPtr.Size * appIdCount);
+
+                // If appId parameter specified then try to find it in the list when
+                // there's more than one appId found in package
                 if (appIdCount > 1)
-                {                    
-                    var allUserModIds = appUserModelId.Split(new [] {'\0'}, StringSplitOptions.RemoveEmptyEntries);
-                    
-                    appUserModelId = allUserModIds[0];
-                }                
-                
+                {
+                    // Extract list one out of the null terminated unicode result
+                    // when more than one result
+                    var allUserModIds = appUserModelId.Split(new[] { '\0' }, StringSplitOptions.RemoveEmptyEntries);
+
+                    if (appId != null)
+                    {
+                        appUserModelId = allUserModIds.ToList().FirstOrDefault(p => p.ToLower().EndsWith(appId.ToLower()));
+                    }
+
+                    if (string.IsNullOrEmpty(appUserModelId))
+                    {
+                        appUserModelId = allUserModIds[0];
+                    }                    
+                }
+                                                             
                 var activation = new ApplicationActivationManager() as IApplicationActivationManager;
 
                 uint pid;

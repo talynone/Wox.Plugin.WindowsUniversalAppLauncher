@@ -31,7 +31,7 @@ namespace Wox.Plugin.WindowsUniversalAppLauncher
             _defaultIcon = Path.Combine(pluginInitContext.CurrentPluginMetadata.PluginDirectory, "Images\\\\pic.png");
 
             Task.Run(LoadStoreItems);
-        }
+        }        
 
         private async Task LoadStoreItems()
         {

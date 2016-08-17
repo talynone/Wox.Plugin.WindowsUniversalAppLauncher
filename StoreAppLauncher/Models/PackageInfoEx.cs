@@ -10,7 +10,9 @@ namespace StoreAppLauncher.Models
     {
         public string DisplayName { get; set; }
         public string Description { get; set; }
+        public string Name { get; set; }
         public string FullName { get; set; }
         public string FullLogoPath { get; set; }
+        public ManifestApplication AppInfo { get; set; }
     }
 }

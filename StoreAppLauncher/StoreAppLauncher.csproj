@@ -33,6 +33,7 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
     <Reference Include="System.Runtime.InteropServices.WindowsRuntime">
       <HintPath>C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETCore\v4.5.1\System.Runtime.InteropServices.WindowsRuntime.dll</HintPath>
     </Reference>
@@ -40,6 +41,7 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETCore\v4.5.1\System.Runtime.WindowsRuntime.dll</HintPath>
     </Reference>
+    <Reference Include="System.Xaml" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -52,8 +54,11 @@
     <Compile Include="ApplicationActivationManager\ActivateOptions.cs" />
     <Compile Include="ApplicationActivationManager\ApplicationActivationManager.cs" />
     <Compile Include="ApplicationActivationManager\IApplicationActivationManager.cs" />
+    <Compile Include="Helpers\ImageHelper.cs" />
+    <Compile Include="Helpers\ImmersiveColors.cs" />
     <Compile Include="Helpers\NativeApiHelper.cs" />
     <Compile Include="Helpers\NativeApiManifestHelpers.cs" />
+    <Compile Include="Helpers\StarScreenColorsHelper.cs" />
     <Compile Include="Models\PackageArchitecture.cs" />
     <Compile Include="Models\ManifestApplication.cs" />
     <Compile Include="Models\ManifestInfo.cs" />

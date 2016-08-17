@@ -31,7 +31,7 @@ namespace StoreAppLauncher
 
         public static uint LaunchApp(PackageInfoEx package)
         {
-            return NativeApiHelper.LaunchApp(package.FullName);
+            return NativeApiHelper.LaunchApp(package.FullName, package.AppInfo.Id);
         }
     }
 }
