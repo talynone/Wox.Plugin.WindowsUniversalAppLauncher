@@ -17,7 +17,7 @@ namespace StoreAppLauncher
         {
             var packageManager = new PackageManager();
 
-            var packages = packageManager.FindPackagesForUser(string.Empty);
+            var packages = packageManager.FindPackagesForUser(string.Empty);            
 
             var packagesInfos = NativeApiManifestHelpers.ToPackageInfoEx(packages, processLogos);
 

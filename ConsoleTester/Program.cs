@@ -19,11 +19,11 @@ namespace ConsoleTester
 
             //var package = packagesList.FirstOrDefault(p => p.DisplayName != null && p.DisplayName.Contains("TD5"));
 
-            var package = storeAppList.FirstOrDefault(p => p.DisplayName.Contains("Edge"));
+            var package = storeAppList.FirstOrDefault(p => p.DisplayName.ToLower().Contains("hearts"));
 
             if (package != null)
             {
-                StoreAppLauncher.StoreAppLauncher.LaunchApp(package);                
+               var result = StoreAppLauncher.StoreAppLauncher.LaunchApp(package);                
             }
                 
             Console.WriteLine();

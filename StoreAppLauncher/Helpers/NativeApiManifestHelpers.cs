@@ -309,15 +309,20 @@ namespace StoreAppLauncher.Helpers
         
         public static IEnumerable<PackageInfoEx> ToPackageInfoEx(IEnumerable<Windows.ApplicationModel.Package> packages, bool processLogo = true)
         {
-            var packageTest = packages.FirstOrDefault(p => p.Id.Name.ToLower().Contains("camera"));
+            //var packageTest = packages.FirstOrDefault(p => p.Id.Name.ToLower().Contains("reader"));
 
-            if (packageTest != null)
-            {
-                var debugOut = "Blah!";
-            }
+//            if (packageTest != null)
+//            {
+//                var debugOut = "Blah!";
+//            }
 
             foreach (var package in packages)
-            {                
+            {
+                if (package.Id.Name.ToLower().Contains("reader"))
+                {
+                    var debugOut = "Blah!";
+                }
+
                 // We don't care about framework
                 // packages, these packages are libraries
                 // not apps

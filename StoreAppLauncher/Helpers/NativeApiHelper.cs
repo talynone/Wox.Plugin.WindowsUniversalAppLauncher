@@ -6,7 +6,9 @@ using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 
 namespace StoreAppLauncher.Helpers
-{        
+{
+    using System.Collections.Generic;
+
     public static class NativeApiHelper
     {
         #region Api Declerations
@@ -156,6 +158,33 @@ namespace StoreAppLauncher.Helpers
             return extractedValue;
         }
 
+//        private static string[] MultiNullTerminatedStringToUnicodeStringArray(string inputString)
+//        {            
+//            return MultiNullTerminatedCharToStringArray(inputString.ToCharArray());
+//        }
+//
+//        private static string[] MultiNullTerminatedCharToStringArray(char[] multistring)
+//        {
+//            List<string> stringList = new List<string>();
+//            int i = 0;
+//            while (i < multistring.Length)
+//            {
+//                int j = i;
+//                if (multistring[j++] == '\0') break;
+//                while (j < multistring.Length)
+//                {
+//                    if (multistring[j++] == '\0')
+//                    {
+//                        stringList.Add(new string(multistring, i, j - i - 1));
+//                        i = j;
+//                        break;
+//                    }
+//                }
+//            }
+//
+//            return stringList.ToArray();
+//        }
+
         public static uint LaunchApp(string packageFullName, string arguments = null)
         {
             var pir = IntPtr.Zero;
@@ -172,25 +201,37 @@ namespace StoreAppLauncher.Helpers
                 }
 
                 int length = 0;
-                int count;
-
-                //f the function succeeds it returns ERROR_SUCCESS. Otherwise, the function 
-                //returns an error code. The possible error codes include the following.
-                //ERROR_INSUFFICIENT_BUFFER                
-                int getPackageApplicationIdsErrorResult = GetPackageApplicationIds(pir, ref length, null, out count);
+                int appIdCount;
+                
+                // First you pass NULL to buffer to get the required size of buffer. You use 
+                // this number to allocate memory space for buffer. Then you pass the 
+                // address of this memory space to fill buffer.             
+                int getPackageApplicationIdsErrorResult = GetPackageApplicationIds(pir, ref length, null, out appIdCount);
 
                 var buffer = new byte[length];
 
-                int getPackageApplicationIdsErrorCodeResult = GetPackageApplicationIds(pir, ref length, buffer, out count);
+                //If the function succeeds it returns ERROR_SUCCESS. Otherwise, the function 
+                //returns an error code. The possible error codes include the following.
+                //ERROR_INSUFFICIENT_BUFFER   
+                int getPackageApplicationIdsErrorCodeResult = GetPackageApplicationIds(pir, ref length, buffer, out appIdCount);
                 Debug.Assert(getPackageApplicationIdsErrorCodeResult == 0);
 
                 if (getPackageApplicationIdsErrorCodeResult != 0)
                 {
-                    throw new Win32Exception(openPackageInfoByFullNameErrorCodeResult);
-                }                    
+                    throw new Win32Exception(getPackageApplicationIdsErrorCodeResult);
+                }
+                
+                var appUserModelId = Encoding.Unicode.GetString(buffer, IntPtr.Size * appIdCount, length - IntPtr.Size * appIdCount);
 
-                var appUserModelId = Encoding.Unicode.GetString(buffer, IntPtr.Size * count, length - IntPtr.Size * count);
-
+                // If more than one Id exists then extract the first one out of 
+                // the null terminated unicode result
+                if (appIdCount > 1)
+                {                    
+                    var allUserModIds = appUserModelId.Split(new [] {'\0'}, StringSplitOptions.RemoveEmptyEntries);
+                    
+                    appUserModelId = allUserModIds[0];
+                }                
+                
                 var activation = new ApplicationActivationManager() as IApplicationActivationManager;
 
                 uint pid;
