@@ -40,6 +40,7 @@ namespace ConsoleTester
             //var package = packagesList.FirstOrDefault(p => p.DisplayName != null && p.DisplayName.Contains("TD5"));
 
             var duplicatePackageNames = storeAppList.GroupBy(p => p.FullName).Where(p => p.Count() > 1);
+            var displayNames = storeAppList.Select(p => p.DisplayName).OrderBy(p=>p).ToList();
 
             foreach (var app in storeAppList)
             {                 

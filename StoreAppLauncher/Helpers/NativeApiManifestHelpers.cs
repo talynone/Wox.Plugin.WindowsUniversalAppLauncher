@@ -214,6 +214,17 @@ namespace StoreAppLauncher.Helpers
             string logoPath;
 
 
+            if (manifestInfo.Apps.Count > 1)
+            {
+                // TODO: More testing if this is even necessary
+                // Try to find logo based on application logo value
+                logoPath = FindLogoImagePath(installedLocationPath, manifestApplication.Logo, findStrategy);
+                if (!string.IsNullOrWhiteSpace(logoPath) && File.Exists(logoPath))
+                {
+                    return logoPath;
+                }
+            }
+
             // Try to find logo based on package logo value
             var mainPackageLogo = manifestInfo.GetPropertyStringValue("Logo");
             logoPath = FindLogoImagePath(installedLocationPath, mainPackageLogo, findStrategy);
@@ -222,58 +233,9 @@ namespace StoreAppLauncher.Helpers
                 return logoPath;
             }
 
-            // TODO: More testing if this is even necessary
-            // Try to find logo based on application logo value
-            logoPath = FindLogoImagePath(installedLocationPath, manifestApplication.Logo, findStrategy);
-            if (!string.IsNullOrWhiteSpace(logoPath) && File.Exists(logoPath))
-            {
-                return logoPath;
-            }
 
             return "";
-        }
-
-        public static string GetModernAppLogo(string installedLocationPath)
-        {
-            // get folder where actual app resides
-            //var exePath = installedLocationPath;
-            var dir = installedLocationPath;
-            var manifestPath = System.IO.Path.Combine(dir, "AppxManifest.xml");
-
-            if (File.Exists(manifestPath))
-            {
-                // this is manifest file
-                string pathToLogo;
-                using (var fs = File.OpenRead(manifestPath))
-                {
-                    var manifest = XDocument.Load(fs);
-
-                    //TODO fix for Windows 8
-                    const string ns = "http://schemas.microsoft.com/appx/manifest/foundation/windows10";
-                    // rude parsing - take more care here
-                    pathToLogo = manifest.Root.Element(XName.Get("Properties", ns)).Element(XName.Get("Logo", ns)).Value;
-                }
-                // now here it is tricky again - there are several files that match logo, for example
-                // black, white, contrast white. Here we choose first, but you might do differently
-                string finalLogo = null;
-                // serach for all files that match file name in Logo element but with any suffix (like "Logo.black.png, Logo.white.png etc)
-                foreach (
-                    var logoFile in
-                    Directory.GetFiles(
-                        System.IO.Path.Combine(dir, System.IO.Path.GetDirectoryName(pathToLogo)),
-                        System.IO.Path.GetFileNameWithoutExtension(pathToLogo) + "*" +
-                        System.IO.Path.GetExtension(pathToLogo)))
-                {
-                    finalLogo = logoFile;
-                    break;
-                }
-
-                return finalLogo;
-
-                
-            }
-            return null;
-        }
+        }        
 
         public static IEnumerable<PackageInfoEx> ToPackageInfoEx(
             IEnumerable<Windows.ApplicationModel.Package> packages,
@@ -286,6 +248,7 @@ namespace StoreAppLauncher.Helpers
             //                var debugOut = "Blah!";
             //            }
 
+        
             foreach (var package in packages)
             {
                
@@ -310,20 +273,17 @@ namespace StoreAppLauncher.Helpers
                 }
               
                 var manifestPath = Path.Combine(installedLocationPath, "AppxManifest.xml");
-                var manifestInfo = GetAppInfoFromManifest(manifestPath);
-                
-                if (manifestInfo.Apps != null)
-                {
-                    foreach (var application in manifestInfo.Apps)
-                    {
-                        // Configured to not display on start menu
-                        // so we skip theses
-                        if (application?.AppListEntry == "none")
-                        {
-                            continue;                            
-                        }
-                        
+                var manifestInfo = GetAppInfoFromManifest(manifestPath);               
 
+                if (manifestInfo.Apps != null)
+                {                   
+                    // Configured to not display on start menu
+                    // so we skip theses
+                    var unlistedApps = manifestInfo.Apps.Where(p => p?.AppListEntry == "none").ToList();
+                    var listedApps = manifestInfo.Apps.Except(unlistedApps);
+
+                    foreach (var application in listedApps)
+                    {                                               
                         var packageInfoEx = new PackageInfoEx();
                         
                         var fullName = package.Id.FullName;
